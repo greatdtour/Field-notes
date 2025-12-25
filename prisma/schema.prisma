@@ -1,0 +1,191 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  USER
+  ADMIN
+}
+
+enum PostStatus {
+  DRAFT
+  PENDING
+  APPROVED
+  REJECTED
+  NEEDS_CHANGES
+}
+
+enum MediaType {
+  PHOTO
+  VIDEO
+}
+
+model User {
+  id         String      @id @default(cuid())
+  name       String
+  email      String      @unique
+  password   String
+  image      String?
+  role       Role        @default(USER)
+  createdAt  DateTime    @default(now())
+  updatedAt  DateTime    @updatedAt
+
+  posts      Post[]
+  comments   Comment[]
+  likes      Like[]
+  adminNotes AdminNote[] @relation("AdminNotes")
+}
+
+model Post {
+  id          String        @id @default(cuid())
+  authorId    String
+  title       String
+  slug        String        @unique
+  excerpt     String?
+  content     String
+  metaTitle   String?
+  metaDesc    String?
+  status      PostStatus    @default(DRAFT)
+  readTimeMin Int           @default(1)
+  revision    Int           @default(1)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  author      User          @relation(fields: [authorId], references: [id])
+  media       Media[]
+  tags        PostTag[]
+  comments    Comment[]
+  likes       Like[]
+  adminNotes  AdminNote[]
+  categories  PostCategory[]
+  revisions   PostRevision[]
+}
+
+model PostRevision {
+  id        String   @id @default(cuid())
+  postId    String
+  revision  Int
+  title     String
+  excerpt   String?
+  content   String
+  metaTitle String?
+  metaDesc  String?
+  createdAt DateTime @default(now())
+
+  post      Post     @relation(fields: [postId], references: [id])
+
+  @@index([postId])
+}
+
+model Media {
+  id        String    @id @default(cuid())
+  postId    String
+  type      MediaType
+  data      Bytes
+  fileName  String
+  mimeType  String
+  altText   String
+  sortOrder Int       @default(0)
+  createdAt DateTime  @default(now())
+
+  post      Post      @relation(fields: [postId], references: [id])
+}
+
+model Tag {
+  id    String   @id @default(cuid())
+  name  String   @unique
+  posts PostTag[]
+}
+
+model PostTag {
+  postId String
+  tagId  String
+
+  post   Post @relation(fields: [postId], references: [id])
+  tag    Tag  @relation(fields: [tagId], references: [id])
+
+  @@id([postId, tagId])
+}
+
+model Category {
+  id    String   @id @default(cuid())
+  name  String   @unique
+  posts PostCategory[]
+}
+
+model PostCategory {
+  postId     String
+  categoryId String
+
+  post     Post     @relation(fields: [postId], references: [id])
+  category Category @relation(fields: [categoryId], references: [id])
+
+  @@id([postId, categoryId])
+}
+
+model Comment {
+  id        String   @id @default(cuid())
+  postId    String
+  authorId  String
+  text      String
+  createdAt DateTime @default(now())
+
+  post      Post     @relation(fields: [postId], references: [id])
+  author    User     @relation(fields: [authorId], references: [id])
+}
+
+model Like {
+  id        String   @id @default(cuid())
+  postId    String
+  userId    String
+  createdAt DateTime @default(now())
+
+  post      Post     @relation(fields: [postId], references: [id])
+  user      User     @relation(fields: [userId], references: [id])
+
+  @@unique([postId, userId])
+}
+
+model AdminNote {
+  id        String   @id @default(cuid())
+  postId    String
+  adminId   String
+  text      String
+  createdAt DateTime @default(now())
+
+  post      Post     @relation(fields: [postId], references: [id])
+  admin     User     @relation("AdminNotes", fields: [adminId], references: [id])
+}
+
+model Subscription {
+  id          String   @id @default(cuid())
+  email       String   @unique
+  wantsToPost Boolean  @default(false)
+  createdAt   DateTime @default(now())
+}
+
+model PartnerInterest {
+  id        String   @id @default(cuid())
+  name      String
+  email     String
+  company   String?
+  message   String?
+  createdAt DateTime @default(now())
+}
+
+model PageSection {
+  id        String   @id @default(cuid())
+  page      String
+  type      String
+  title     String?
+  body      String?
+  order     Int      @default(0)
+  visible   Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}

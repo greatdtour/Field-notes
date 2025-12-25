@@ -1,0 +1,641 @@
+import Link from "next/link";
+import { notFound, redirect } from "next/navigation";
+import { prisma } from "@/lib/db";
+import { getSessionUser } from "@/lib/auth";
+import { EssayActionIcons } from "@/components/EssayActionIcons";
+import { CommentsSection } from "@/components/CommentsSection";
+import { LightboxImage } from "@/components/LightboxImage";
+import { AdminReviewModal } from "@/components/AdminReviewModal";
+import { renderInlineText } from "@/lib/inlineFormat";
+
+export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }) {
+  const resolvedParams = await params;
+  const post = await prisma.post.findUnique({
+    where: { slug: resolvedParams.slug },
+    select: { title: true, metaTitle: true, metaDesc: true },
+  });
+
+  if (!post) {
+    return {};
+  }
+
+  return {
+    title: post.metaTitle || post.title,
+    description: post.metaDesc || undefined,
+  };
+}
+
+type MediaItem = {
+  id: string;
+  type: "PHOTO" | "VIDEO";
+  mimeType: string;
+  altText: string;
+  sortOrder: number;
+};
+
+type ContentBlock = {
+  id?: string;
+  type?: string;
+  level?: string;
+  text?: string;
+  items?: string[];
+  caption?: string;
+  altText?: string;
+  galleryItems?: { caption?: string; altText?: string }[];
+  overlayTitle?: string;
+  overlayText?: string;
+  height?: number;
+};
+
+function formatDate(date: Date) {
+  return new Date(date).toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+}
+
+function getCategoryLabel(categories: { category: { name: string } }[]) {
+  return categories[0]?.category.name ?? "Field Notes";
+}
+
+function parseBlocks(content: string): ContentBlock[] | null {
+  try {
+    const blocks = JSON.parse(content);
+    return Array.isArray(blocks) ? blocks : null;
+  } catch {
+    return null;
+  }
+}
+
+async function reviewPost(formData: FormData) {
+  "use server";
+
+  const user = await getSessionUser();
+  if (!user || user.role !== "ADMIN") {
+    redirect("/login");
+  }
+
+  const postId = String(formData.get("postId") || "");
+  const status = String(formData.get("status") || "");
+  const note = String(formData.get("note") || "").trim();
+
+  if (!postId || !["APPROVED", "NEEDS_CHANGES"].includes(status)) {
+    return;
+  }
+
+  if (status === "NEEDS_CHANGES" && !note) {
+    return;
+  }
+
+  const post = await prisma.post.findUnique({
+    where: { id: postId },
+    select: { slug: true },
+  });
+
+  if (!post) {
+    return;
+  }
+
+  await prisma.post.update({
+    where: { id: postId },
+    data: { status: status as "APPROVED" | "NEEDS_CHANGES" },
+  });
+
+  if (note) {
+    await prisma.adminNote.create({
+      data: { postId, adminId: user.id, text: note },
+    });
+  }
+
+  redirect(`/essay/${post.slug}?reviewed=1`);
+}
+
+function renderBlocks(
+  blocks: ContentBlock[],
+  media: MediaItem[],
+  startMediaIndex: number,
+  lightboxItems: { id: string; src: string; alt: string; caption?: string | null }[]
+) {
+  let mediaIndex = startMediaIndex;
+
+  return blocks.map((block, index) => {
+    const key = block.id || `${block.type ?? "block"}-${index}`;
+
+    if (block.type === "heading") {
+      return null;
+    }
+
+    if (block.type === "quote") {
+      return (
+        <blockquote
+          key={key}
+          className="border-l-4 pl-6 text-[20px] italic leading-[28px] tracking-[-0.45px]"
+          style={{ borderColor: "#f54900", color: "var(--text-primary)" }}
+        >
+          {renderInlineText(block.text ?? "")}
+        </blockquote>
+      );
+    }
+
+    if (block.type === "list") {
+      return (
+        <ul
+          key={key}
+          className="list-disc pl-6 text-[18px] leading-[29.25px]"
+          style={{ color: "var(--text-secondary)" }}
+        >
+          {(block.items || []).map((item, itemIndex) => (
+            <li key={`${key}-item-${itemIndex}`}>{renderInlineText(item)}</li>
+          ))}
+        </ul>
+      );
+    }
+
+    if (block.type === "media") {
+      const current = media[mediaIndex];
+      if (!current) {
+        return null;
+      }
+      mediaIndex += 1;
+      if (current) {
+        const blockHeight = typeof block.height === "number" ? block.height : undefined;
+        return (
+          <figure key={key} className="grid gap-3">
+            {current.type === "VIDEO" ? (
+              <video
+                controls
+                className="w-full rounded-[10px] object-cover"
+                style={blockHeight ? { height: blockHeight } : undefined}
+              >
+                <source src={`/api/media/${current.id}`} type={current.mimeType} />
+              </video>
+            ) : (
+              <LightboxImage
+                itemId={current.id}
+                items={lightboxItems}
+                src={`/api/media/${current.id}`}
+                alt={current.altText}
+                caption={block.caption || block.altText || current.altText}
+                className="w-full rounded-[10px] object-cover"
+                imageStyle={blockHeight ? { height: blockHeight } : undefined}
+              />
+            )}
+            <figcaption
+              className="text-center text-[14px] leading-[20px]"
+              style={{ color: "var(--text-muted)" }}
+            >
+              {block.caption || block.altText || current.altText}
+            </figcaption>
+          </figure>
+        );
+      }
+    }
+
+    if (block.type === "gallery") {
+      const galleryItems = Array.isArray(block.galleryItems) ? block.galleryItems : [];
+      if (!galleryItems.length) {
+        return null;
+      }
+      const galleryMedia: MediaItem[] = [];
+      for (let i = 0; i < galleryItems.length; i += 1) {
+        const current = media[mediaIndex];
+        if (!current) break;
+        galleryMedia.push(current);
+        mediaIndex += 1;
+      }
+      if (!galleryMedia.length) {
+        return null;
+      }
+      return (
+        <div key={key} className="story-gallery-grid">
+          {galleryMedia.map((item, galleryIndex) => {
+            if (!item) return null;
+            const caption = galleryItems[galleryIndex]?.caption;
+            const fallbackAlt = galleryItems[galleryIndex]?.altText || item.altText;
+            return (
+              <figure key={`${key}-gallery-${galleryIndex}`} className="story-gallery-item">
+                {item.type === "VIDEO" ? (
+                  <video controls className="w-full rounded-[10px]">
+                    <source src={`/api/media/${item.id}`} type={item.mimeType} />
+                  </video>
+                ) : (
+                    <LightboxImage
+                      itemId={item.id}
+                      items={lightboxItems}
+                      src={`/api/media/${item.id}`}
+                      alt={fallbackAlt}
+                      caption={caption || fallbackAlt}
+                      className="w-full rounded-[10px] object-cover"
+                    />
+                )}
+                {caption ? (
+                  <figcaption className="story-gallery-caption">{caption}</figcaption>
+                ) : null}
+              </figure>
+            );
+          })}
+        </div>
+      );
+    }
+
+    if (block.type === "background") {
+      const current = media[mediaIndex];
+      if (!current) {
+        return null;
+      }
+      mediaIndex += 1;
+      const blockHeight = typeof block.height === "number" ? block.height : undefined;
+      return (
+        <section
+          key={key}
+          className="relative overflow-hidden rounded-[10px] min-h-[320px] flex items-end"
+          style={blockHeight ? { height: blockHeight } : undefined}
+        >
+          {current.type === "VIDEO" ? (
+            <video autoPlay muted loop playsInline className="absolute inset-0 h-full w-full object-cover">
+              <source src={`/api/media/${current.id}`} type={current.mimeType} />
+            </video>
+          ) : (
+            <LightboxImage
+              itemId={current.id}
+              items={lightboxItems}
+              src={`/api/media/${current.id}`}
+              alt={block.altText || current.altText}
+              caption={block.overlayTitle || block.overlayText || block.altText || current.altText}
+              wrapperClassName="absolute inset-0 h-full w-full"
+              className="h-full w-full object-cover"
+            />
+          )}
+          <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/70 via-black/30 to-transparent" />
+          <div className="relative z-10 p-8 text-white">
+            {block.overlayTitle ? (
+              <h3 className="text-2xl font-semibold">{renderInlineText(block.overlayTitle)}</h3>
+            ) : null}
+            {block.overlayText ? (
+              <p className="mt-3 text-sm text-white/80 max-w-[520px]">
+                {renderInlineText(block.overlayText)}
+              </p>
+            ) : null}
+          </div>
+        </section>
+      );
+    }
+
+    if (block.type === "divider") {
+      return <hr key={key} style={{ borderColor: 'var(--border-gray)' }} />;
+    }
+
+    return (
+      <p key={key} className="text-[18px] leading-[29.25px] tracking-[-0.44px]" style={{ color: 'var(--text-primary)' }}>
+        {renderInlineText(block.text ?? "")}
+      </p>
+    );
+  });
+}
+
+function renderPlainText(content: string) {
+  const lines = content.split("\n");
+  return lines.map((line, index) => {
+    const trimmed = line.trim();
+    if (!trimmed) return <div key={`spacer-${index}`} className="h-4" />;
+
+    return (
+      <p key={index} className="text-[18px] leading-[29.25px] tracking-[-0.44px]" style={{ color: 'var(--text-primary)' }}>
+        {renderInlineText(trimmed)}
+      </p>
+    );
+  });
+}
+
+export default async function EssayPage({ params }: { params: Promise<{ slug: string }> }) {
+  const user = await getSessionUser();
+  const resolvedParams = await params;
+  const post = await prisma.post.findUnique({
+    where: { slug: resolvedParams.slug },
+    include: {
+      author: true,
+      media: true,
+      categories: { include: { category: true } },
+    },
+  });
+
+  const isAdmin = user?.role === "ADMIN";
+  if (!post || (!isAdmin && post.status !== "APPROVED")) {
+    notFound();
+  }
+
+  const sortedMedia = [...post.media].sort((a, b) => a.sortOrder - b.sortOrder);
+  const heroMedia = sortedMedia[0];
+  const blocks = parseBlocks(post.content);
+  const heroBlock = blocks?.[0];
+  const heroHeight = typeof heroBlock?.height === "number" ? heroBlock.height : 477;
+  const shouldSkipFirstBlock = blocks?.[0]?.type === "media" || blocks?.[0]?.type === "background";
+  const contentBlocks = blocks ? (shouldSkipFirstBlock ? blocks.slice(1) : blocks) : null;
+  const startMediaIndex = heroMedia ? 1 : 0;
+  const authorImage = post.author.image;
+  const authorInitials = post.author.name
+    .split(" ")
+    .map((part) => part[0])
+    .join("")
+    .slice(0, 2)
+    .toUpperCase();
+  const canEditPost = !!user && (user.role === "ADMIN" || user.id === post.authorId);
+
+  const lightboxItems = sortedMedia
+    .filter((item) => item.type === "PHOTO")
+    .map((item) => ({
+      id: item.id,
+      src: `/api/media/${item.id}`,
+      alt: item.altText,
+      caption: item.altText,
+    }));
+
+  return (
+    <main style={{ background: "var(--bg-white)", color: "var(--text-primary)" }}>
+      <div className="mx-auto max-w-[896px] px-6 pb-20 pt-10">
+        <Link
+          href="/home"
+          className="inline-flex items-center gap-2 text-[16px]"
+          style={{ color: "var(--text-tertiary)" }}
+        >
+          <svg
+            aria-hidden
+            viewBox="0 0 24 24"
+            className="h-5 w-5"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <path d="M19 12H5" />
+            <path d="M12 19l-7-7 7-7" />
+          </svg>
+          Back to Home
+        </Link>
+
+        <article className="mt-8">
+          <p className="text-[14px] uppercase tracking-[0.55px] text-[#f54900]">
+            {getCategoryLabel(post.categories)}
+          </p>
+          <h1
+            className="mt-4 text-[36px] leading-[44px] font-semibold md:text-[56px] md:leading-[67px]"
+            style={{ color: "var(--text-primary)" }}
+          >
+            {post.title}
+          </h1>
+          <p
+            className="mt-4 text-[18px] leading-[29.25px] tracking-[-0.45px] md:text-[20px] md:leading-[32.5px]"
+            style={{ color: "var(--text-secondary)" }}
+          >
+            {post.excerpt ??
+              "An unforgettable journey through one of the world's most dramatic landscapes, where towering peaks meet endless glaciers and the wind carries stories of ancient explorers."}
+          </p>
+
+          <div
+            className="mt-8 flex flex-wrap items-center justify-between gap-6 border-b pb-6"
+            style={{ borderColor: "var(--border-gray)" }}
+          >
+            <div className="flex items-center gap-4">
+              {authorImage ? (
+                <img
+                  src={authorImage}
+                  alt={post.author.name}
+                  className="h-12 w-12 rounded-full object-cover"
+                />
+              ) : (
+                <div
+                  className="flex h-12 w-12 items-center justify-center rounded-full text-[14px] font-semibold"
+                  style={{ background: "var(--bg-gray-100)", color: "var(--text-tertiary)" }}
+                >
+                  {authorInitials}
+                </div>
+              )}
+              <div>
+                <p className="text-[16px] tracking-[-0.31px]" style={{ color: "var(--text-primary)" }}>
+                  {post.author.name}
+                </p>
+                <div
+                  className="mt-1 flex flex-wrap items-center gap-3 text-[14px]"
+                  style={{ color: "var(--text-muted)" }}
+                >
+                  <span className="inline-flex items-center gap-2">
+                    <svg
+                      aria-hidden
+                      viewBox="0 0 24 24"
+                      className="h-4 w-4"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="1.8"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <rect x="3" y="4" width="18" height="18" rx="2" />
+                      <path d="M16 2v4" />
+                      <path d="M8 2v4" />
+                      <path d="M3 10h18" />
+                    </svg>
+                    {formatDate(post.createdAt)}
+                  </span>
+                  <span aria-hidden>&middot;</span>
+                  <span className="inline-flex items-center gap-2">
+                    <svg
+                      aria-hidden
+                      viewBox="0 0 24 24"
+                      className="h-4 w-4"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="1.8"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <circle cx="12" cy="12" r="9" />
+                      <path d="M12 7v5l3 3" />
+                    </svg>
+                    {post.readTimeMin} min read
+                  </span>
+                </div>
+              </div>
+            </div>
+            <div className="flex flex-wrap items-center justify-end gap-3">
+              <EssayActionIcons
+                postId={post.id}
+                slug={post.slug}
+                canLike={!!user}
+                title={post.title}
+                excerpt={post.excerpt ?? ""}
+                imageUrl={heroMedia?.type === "PHOTO" ? `/api/media/${heroMedia.id}` : undefined}
+                currentUser={user ? { id: user.id, name: user.name, image: user.image, role: user.role } : undefined}
+              />
+              {canEditPost ? (
+                <div className="flex flex-col items-end">
+                  {user?.role === "ADMIN" ? (
+                    <AdminReviewModal postId={post.id} postTitle={post.title} action={reviewPost} />
+                  ) : (
+                    <>
+                      <Link className="edit-story-link" href={`/editor/edit/${post.id}`}>
+                        Edit story
+                      </Link>
+                      <span className="edit-story-note">Edits resubmit for approval.</span>
+                    </>
+                  )}
+                </div>
+              ) : null}
+            </div>
+          </div>
+
+          {heroMedia ? (
+            <div className="mt-8 overflow-hidden rounded-[10px]" style={{ height: heroHeight }}>
+              {heroMedia.type === "VIDEO" ? (
+                <video controls className="h-full w-full object-cover">
+                  <source src={`/api/media/${heroMedia.id}`} type={heroMedia.mimeType} />
+                </video>
+              ) : (
+                <LightboxImage
+                  itemId={heroMedia.id}
+                  items={lightboxItems}
+                  src={`/api/media/${heroMedia.id}`}
+                  alt={heroMedia.altText}
+                  caption={heroMedia.altText}
+                  className="h-full w-full object-cover"
+                  wrapperClassName="h-full"
+                />
+              )}
+            </div>
+          ) : null}
+
+          <div className="mt-10 grid gap-6">
+            {contentBlocks
+              ? renderBlocks(contentBlocks, sortedMedia, startMediaIndex, lightboxItems)
+              : renderPlainText(post.content)}
+          </div>
+
+          <CommentsSection
+            slug={post.slug}
+            currentUser={user ? { id: user.id, name: user.name, image: user.image, role: user.role } : undefined}
+            postAuthor={{ id: post.authorId, name: post.author.name }}
+          />
+
+          <div className="mt-12 border-t pt-8" style={{ borderColor: 'var(--border-gray)' }}>
+            <div className="flex flex-wrap gap-6">
+              {authorImage ? (
+                <img
+                  src={authorImage}
+                  alt={post.author.name}
+                  className="h-20 w-20 rounded-full object-cover"
+                />
+              ) : (
+                <div className="flex h-20 w-20 items-center justify-center rounded-full text-[18px] font-semibold" style={{ background: 'var(--bg-gray-200)', color: 'var(--text-tertiary)' }}>
+                  {authorInitials}
+                </div>
+              )}
+              <div className="flex-1">
+                <p className="text-[20px] leading-[28px] tracking-[-0.45px]" style={{ color: 'var(--text-primary)' }}>
+                  Written by {post.author.name}
+                </p>
+                <p className="mt-2 text-[16px] leading-[26px] tracking-[-0.31px]" style={{ color: 'var(--text-tertiary)' }}>
+                  Adventure journalist and photographer based in Denver. Sarah has trekked across six continents and contributes to National Geographic and Outside Magazine.
+                </p>
+                <button
+                  type="button"
+                  className="mt-4 text-[16px] font-medium tracking-[-0.31px] text-[#f54900]"
+                >
+                  Follow
+                </button>
+              </div>
+            </div>
+          </div>
+        </article>
+      </div>
+
+      <section className="bg-[#b54a1a] dark:bg-[#101828] text-white">
+        <div className="mx-auto max-w-[1232px] px-6 py-16">
+          <div className="mx-auto max-w-[896px] text-center">
+            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-white/10">
+              <svg
+                aria-hidden
+                viewBox="0 0 24 24"
+                className="h-8 w-8 text-white"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.8"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="M4 6h16" />
+                <path d="M4 6l8 6 8-6" />
+                <path d="M4 6v12h16V6" />
+              </svg>
+            </div>
+            <h2 className="mt-6 text-[32px] font-semibold md:text-[48px]">Subscribe to Field Notes</h2>
+            <p className="mx-auto mt-4 max-w-2xl text-[16px] leading-[1.6] text-white md:text-[20px]">
+              Get our latest stories delivered to your inbox. Join thousands of travelers discovering the world through authentic experiences.
+            </p>
+            <form
+              action="/api/subscribe"
+              method="post"
+              className="mx-auto mt-8 flex w-full max-w-[576px] flex-col gap-4 md:flex-row"
+            >
+              <label className="flex-1">
+                <span className="sr-only">Email address</span>
+                <input
+                  type="email"
+                  name="email"
+                  required
+                  placeholder="Enter your email address"
+                  className="h-[58px] w-full rounded-full border border-white/20 bg-white/10 px-6 text-[16px] text-white placeholder:text-[#99a1af]"
+                />
+              </label>
+              <button
+                type="submit"
+                className="h-[58px] rounded-full bg-white px-8 text-[16px] font-medium text-[#101828]"
+              >
+                Subscribe
+              </button>
+            </form>
+            <p className="mt-4 text-[14px] text-white/80">
+              No spam. Unsubscribe anytime. We respect your privacy.
+            </p>
+          </div>
+
+          <div className="mt-12 flex flex-col gap-8 border-t border-white/10 pt-10 md:flex-row md:items-center md:justify-between">
+            <div>
+              <p className="text-[16px] italic text-white">
+                Follow our journey as we curate India&apos;s most unique travel stories.
+              </p>
+              <div className="mt-4 flex items-center gap-4 text-white/80">
+                <a href="https://facebook.com" aria-label="Facebook" className="transition hover:text-white">
+                  <svg viewBox="0 0 24 24" className="h-5 w-5" fill="currentColor">
+                    <path d="M22 12a10 10 0 1 0-11.56 9.9v-7H7.9v-2.9h2.54V9.4c0-2.5 1.5-3.9 3.8-3.9 1.1 0 2.2.2 2.2.2v2.4h-1.2c-1.2 0-1.6.8-1.6 1.6v1.9h2.8l-.4 2.9h-2.4v7A10 10 0 0 0 22 12Z" />
+                  </svg>
+                </a>
+                <a href="https://instagram.com" aria-label="Instagram" className="transition hover:text-white">
+                  <svg viewBox="0 0 24 24" className="h-5 w-5" fill="currentColor">
+                    <path d="M12 7.3a4.7 4.7 0 1 0 0 9.4 4.7 4.7 0 0 0 0-9.4Zm0 7.6a2.9 2.9 0 1 1 0-5.8 2.9 2.9 0 0 1 0 5.8Zm6-7.9a1.1 1.1 0 1 1-2.2 0 1.1 1.1 0 0 1 2.2 0Zm3.1 1.1c-.1-1.2-.3-2.3-1.2-3.2-.9-.9-2-1.1-3.2-1.2-1.3-.1-5.1-.1-6.4 0-1.2.1-2.3.3-3.2 1.2-.9.9-1.1 2-1.2 3.2-.1 1.3-.1 5.1 0 6.4.1 1.2.3 2.3 1.2 3.2.9.9 2 1.1 3.2 1.2 1.3.1 5.1.1 6.4 0 1.2-.1 2.3-.3 3.2-1.2.9-.9 1.1-2 1.2-3.2.1-1.3.1-5.1 0-6.4Zm-2.2 7.7a3.6 3.6 0 0 1-2 2c-1.4.6-4.6.4-5.9.4s-4.5.2-5.9-.4a3.6 3.6 0 0 1-2-2c-.6-1.4-.4-4.6-.4-5.9s-.2-4.5.4-5.9a3.6 3.6 0 0 1 2-2c1.4-.6 4.6-.4 5.9-.4s4.5-.2 5.9.4a3.6 3.6 0 0 1 2 2c.6 1.4.4 4.6.4 5.9s.2 4.5-.4 5.9Z" />
+                  </svg>
+                </a>
+                <a href="https://linkedin.com" aria-label="LinkedIn" className="transition hover:text-white">
+                  <svg viewBox="0 0 24 24" className="h-5 w-5" fill="currentColor">
+                    <path d="M20.4 3H3.6A1.6 1.6 0 0 0 2 4.6v14.8A1.6 1.6 0 0 0 3.6 21h16.8a1.6 1.6 0 0 0 1.6-1.6V4.6A1.6 1.6 0 0 0 20.4 3ZM8.1 18.2H5.4V9h2.7v9.2ZM6.8 7.9a1.6 1.6 0 1 1 0-3.2 1.6 1.6 0 0 1 0 3.2ZM18.6 18.2h-2.7v-4.7c0-1.1 0-2.6-1.6-2.6-1.6 0-1.8 1.2-1.8 2.5v4.8h-2.7V9h2.6v1.3h.1c.4-.7 1.4-1.5 2.8-1.5 3 0 3.5 2 3.5 4.5v4.9Z" />
+                  </svg>
+                </a>
+              </div>
+            </div>
+            <div className="text-sm text-white/80 md:text-right">
+              <p>
+                Contact Us :
+                <a className="ml-2 text-white" href="mailto:hello@greatdtour.com">
+                  hello@greatdtour.com
+                </a>
+              </p>
+              <p className="mt-2 text-xs text-white/60">
+                All Rights Reserved by Chomps Innovation Labs LLP, Bengaluru, India
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+  );
+}
