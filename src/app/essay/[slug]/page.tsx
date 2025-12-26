@@ -1,4 +1,5 @@
 import Link from "next/link";
+import starIcon from "@/app/assets/star.svg";
 import { notFound, redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { getSessionUser } from "@/lib/auth";
@@ -341,6 +342,7 @@ export default async function EssayPage({ params }: { params: Promise<{ slug: st
     .slice(0, 2)
     .toUpperCase();
   const canEditPost = !!user && (user.role === "ADMIN" || user.id === post.authorId);
+  const isAdminAuthor = user?.role === "ADMIN" && user.id === post.authorId;
 
   const lightboxItems = sortedMedia
     .filter((item) => item.type === "PHOTO")
@@ -470,14 +472,18 @@ export default async function EssayPage({ params }: { params: Promise<{ slug: st
               />
               {canEditPost ? (
                 <div className="flex flex-col items-end">
-                  {user?.role === "ADMIN" ? (
+                  {user?.role === "ADMIN" && !isAdminAuthor ? (
                     <AdminReviewModal postId={post.id} postTitle={post.title} action={reviewPost} />
                   ) : (
                     <>
                       <Link className="edit-story-link" href={`/editor/edit/${post.id}`}>
                         Edit story
                       </Link>
-                      <span className="edit-story-note">Edits resubmit for approval.</span>
+                      {isAdminAuthor ? (
+                        <span className="edit-story-note">Changes publish immediately.</span>
+                      ) : (
+                        <span className="edit-story-note">Edits resubmit for approval.</span>
+                      )}
                     </>
                   )}
                 </div>
@@ -549,89 +555,36 @@ export default async function EssayPage({ params }: { params: Promise<{ slug: st
         </article>
       </div>
 
-      <section className="bg-[#b54a1a] dark:bg-[#101828] text-white">
-        <div className="mx-auto max-w-[1232px] px-6 py-16">
-          <div className="mx-auto max-w-[896px] text-center">
-            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-white/10">
-              <svg
-                aria-hidden
-                viewBox="0 0 24 24"
-                className="h-8 w-8 text-white"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.8"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <path d="M4 6h16" />
-                <path d="M4 6l8 6 8-6" />
-                <path d="M4 6v12h16V6" />
-              </svg>
+      <section className="px-6 py-16">
+        <div className="mx-auto max-w-[1232px]">
+          <div
+            className="w-full rounded-2xl px-6 py-16 text-center md:px-20 md:py-20"
+            style={{
+              background:
+                "radial-gradient(ellipse 50% 126.87% at 50% 50%, #D0110C 0%, #F47300 40%, #E84300 67%, #290B61 100%)",
+              backdropFilter: "blur(71px)",
+            }}
+          >
+            <div className="mx-auto inline-flex items-center gap-2 rounded-full bg-[#101828] px-5 py-2 text-sm text-white">
+              <img src={starIcon.src} alt="" className="h-4 w-4" />
+              <span>Coming Soon</span>
             </div>
-            <h2 className="mt-6 text-[32px] font-semibold md:text-[48px]">Subscribe to Field Notes</h2>
-            <p className="mx-auto mt-4 max-w-2xl text-[16px] leading-[1.6] text-white md:text-[20px]">
-              Get our latest stories delivered to your inbox. Join thousands of travelers discovering the world through authentic experiences.
+            <h2 className="mt-8 text-[32px] font-semibold leading-tight text-white md:text-[48px]">
+              Introducing Great D&apos;Tour
+            </h2>
+            <p className="mx-auto mt-4 max-w-3xl text-[18px] leading-8 text-white/90 md:text-[24px]">
+              A new platform for discovering and booking niche travel experiences. From hidden
+              cultural gems to off-the-beaten-path adventures, Great D&apos;Tour connects you with
+              extraordinary journeys curated by local experts.
             </p>
-            <form
-              action="/api/subscribe"
-              method="post"
-              className="mx-auto mt-8 flex w-full max-w-[576px] flex-col gap-4 md:flex-row"
-            >
-              <label className="flex-1">
-                <span className="sr-only">Email address</span>
-                <input
-                  type="email"
-                  name="email"
-                  required
-                  placeholder="Enter your email address"
-                  className="h-[58px] w-full rounded-full border border-white/20 bg-white/10 px-6 text-[16px] text-white placeholder:text-[#99a1af]"
-                />
-              </label>
-              <button
-                type="submit"
-                className="h-[58px] rounded-full bg-white px-8 text-[16px] font-medium text-[#101828]"
+            <div className="mt-10 flex justify-center">
+              <Link
+                href="/register"
+                className="inline-flex h-12 items-center justify-center rounded-full bg-white px-10 text-[16px] font-semibold text-[#D0110C]"
+                style={{ color: "#D0110C" }}
               >
-                Subscribe
-              </button>
-            </form>
-            <p className="mt-4 text-[14px] text-white/80">
-              No spam. Unsubscribe anytime. We respect your privacy.
-            </p>
-          </div>
-
-          <div className="mt-12 flex flex-col gap-8 border-t border-white/10 pt-10 md:flex-row md:items-center md:justify-between">
-            <div>
-              <p className="text-[16px] italic text-white">
-                Follow our journey as we curate India&apos;s most unique travel stories.
-              </p>
-              <div className="mt-4 flex items-center gap-4 text-white/80">
-                <a href="https://facebook.com" aria-label="Facebook" className="transition hover:text-white">
-                  <svg viewBox="0 0 24 24" className="h-5 w-5" fill="currentColor">
-                    <path d="M22 12a10 10 0 1 0-11.56 9.9v-7H7.9v-2.9h2.54V9.4c0-2.5 1.5-3.9 3.8-3.9 1.1 0 2.2.2 2.2.2v2.4h-1.2c-1.2 0-1.6.8-1.6 1.6v1.9h2.8l-.4 2.9h-2.4v7A10 10 0 0 0 22 12Z" />
-                  </svg>
-                </a>
-                <a href="https://instagram.com" aria-label="Instagram" className="transition hover:text-white">
-                  <svg viewBox="0 0 24 24" className="h-5 w-5" fill="currentColor">
-                    <path d="M12 7.3a4.7 4.7 0 1 0 0 9.4 4.7 4.7 0 0 0 0-9.4Zm0 7.6a2.9 2.9 0 1 1 0-5.8 2.9 2.9 0 0 1 0 5.8Zm6-7.9a1.1 1.1 0 1 1-2.2 0 1.1 1.1 0 0 1 2.2 0Zm3.1 1.1c-.1-1.2-.3-2.3-1.2-3.2-.9-.9-2-1.1-3.2-1.2-1.3-.1-5.1-.1-6.4 0-1.2.1-2.3.3-3.2 1.2-.9.9-1.1 2-1.2 3.2-.1 1.3-.1 5.1 0 6.4.1 1.2.3 2.3 1.2 3.2.9.9 2 1.1 3.2 1.2 1.3.1 5.1.1 6.4 0 1.2-.1 2.3-.3 3.2-1.2.9-.9 1.1-2 1.2-3.2.1-1.3.1-5.1 0-6.4Zm-2.2 7.7a3.6 3.6 0 0 1-2 2c-1.4.6-4.6.4-5.9.4s-4.5.2-5.9-.4a3.6 3.6 0 0 1-2-2c-.6-1.4-.4-4.6-.4-5.9s-.2-4.5.4-5.9a3.6 3.6 0 0 1 2-2c1.4-.6 4.6-.4 5.9-.4s4.5-.2 5.9.4a3.6 3.6 0 0 1 2 2c.6 1.4.4 4.6.4 5.9s.2 4.5-.4 5.9Z" />
-                  </svg>
-                </a>
-                <a href="https://linkedin.com" aria-label="LinkedIn" className="transition hover:text-white">
-                  <svg viewBox="0 0 24 24" className="h-5 w-5" fill="currentColor">
-                    <path d="M20.4 3H3.6A1.6 1.6 0 0 0 2 4.6v14.8A1.6 1.6 0 0 0 3.6 21h16.8a1.6 1.6 0 0 0 1.6-1.6V4.6A1.6 1.6 0 0 0 20.4 3ZM8.1 18.2H5.4V9h2.7v9.2ZM6.8 7.9a1.6 1.6 0 1 1 0-3.2 1.6 1.6 0 0 1 0 3.2ZM18.6 18.2h-2.7v-4.7c0-1.1 0-2.6-1.6-2.6-1.6 0-1.8 1.2-1.8 2.5v4.8h-2.7V9h2.6v1.3h.1c.4-.7 1.4-1.5 2.8-1.5 3 0 3.5 2 3.5 4.5v4.9Z" />
-                  </svg>
-                </a>
-              </div>
-            </div>
-            <div className="text-sm text-white/80 md:text-right">
-              <p>
-                Contact Us :
-                <a className="ml-2 text-white" href="mailto:hello@greatdtour.com">
-                  hello@greatdtour.com
-                </a>
-              </p>
-              <p className="mt-2 text-xs text-white/60">
-                All Rights Reserved by Chomps Innovation Labs LLP, Bengaluru, India
-              </p>
+                Sign Up
+              </Link>
             </div>
           </div>
         </div>

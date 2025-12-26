@@ -53,6 +53,8 @@ model Post {
   status      PostStatus    @default(DRAFT)
   readTimeMin Int           @default(1)
   revision    Int           @default(1)
+  isFeatured  Boolean       @default(false)
+  editorialPickOrder Int?
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @updatedAt
 
@@ -64,6 +66,8 @@ model Post {
   adminNotes  AdminNote[]
   categories  PostCategory[]
   revisions   PostRevision[]
+
+  @@unique([editorialPickOrder])
 }
 
 model PostRevision {

@@ -6,6 +6,7 @@ import { getSessionUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { NotificationsBell } from "@/components/NotificationsBell";
 import { LogoutButton } from "@/components/LogoutButton";
+import gdtLogo from "@/app/assets/gdt_logo.png";
 import { SiteNav } from "@/components/SiteNav";
 import { ThemeInitializer } from "@/components/ThemeInitializer";
 import { ThemeToggle } from "@/components/ThemeToggle";
@@ -62,7 +63,7 @@ export default async function RootLayout({
           <div className="mx-auto flex h-[73px] max-w-[1232px] flex-wrap items-center justify-between gap-4 px-6">
             <Link href="/home" className="flex items-center">
               <img
-                src="/assets/figma/dtour-logo.png"
+                src={gdtLogo.src}
                 alt="Great D'Tour"
                 className="site-logo"
               />

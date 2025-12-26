@@ -42,7 +42,7 @@ async function updatePost(formData: FormData) {
   }
 
   const readTimeMin = estimateReadTimeMinutes(content);
-  const status = post.status;
+  const status = user.role === "ADMIN" ? post.status : "PENDING";
   const resolvedExcerpt = excerpt || extractPreviewText(content, 160);
   const shouldRevise = status !== "DRAFT";
   const nextRevision = shouldRevise ? post.revision + 1 : post.revision;
@@ -328,7 +328,10 @@ export default async function EditPostPage({ params }: { params: Promise<{ id: s
                 <p className="editor-panel-title">SEO</p>
                 <SeoFields excerpt={post.excerpt ?? ""} metaTitle={post.metaTitle ?? ""} metaDesc={post.metaDesc ?? ""} />
               </div>
-              <PreSubmitChecklist formId="editor-form" buttonLabel="Resubmit for Review" />
+              <PreSubmitChecklist
+                formId="editor-form"
+                buttonLabel={user.role === "ADMIN" && post.authorId === user.id ? "Publish changes" : "Resubmit for Review"}
+              />
             </aside>
           </div>
         </form>

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import starIcon from "@/app/assets/star.svg";
 import { prisma } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
@@ -40,6 +41,8 @@ export default async function FieldNotesPage() {
     author: { name: string; image?: string | null };
     categories: { category: { name: string } }[];
     media: { id: string; type: "PHOTO" | "VIDEO" }[];
+    isFeatured: boolean;
+    editorialPickOrder: number | null;
   }> = [];
 
   try {
@@ -56,9 +59,17 @@ export default async function FieldNotesPage() {
     console.error("Database connection error:", error);
   }
 
-  const featured = posts[0];
-  const editorialPicks = posts.slice(1, 4);
-  const fieldNotes = posts.slice(4, 7);
+  const featured =
+    posts.find((post) => post.isFeatured) ??
+    posts[0];
+  const editorialSelected = posts
+    .filter((post) => post.editorialPickOrder !== null)
+    .sort((a, b) => (a.editorialPickOrder ?? 0) - (b.editorialPickOrder ?? 0))
+    .filter((post) => post.id !== featured?.id);
+  const editorialFallback = posts.filter((post) => post.id !== featured?.id).slice(0, 3);
+  const editorialPicks = editorialSelected.length ? editorialSelected.slice(0, 3) : editorialFallback;
+  const curatedIds = new Set([featured?.id, ...editorialPicks.map((post) => post.id)].filter(Boolean));
+  const fieldNotes = posts.filter((post) => !curatedIds.has(post.id)).slice(0, 3);
 
   return (
     <main style={{ background: 'var(--bg-white)', color: 'var(--text-primary)' }}>
@@ -218,57 +229,6 @@ export default async function FieldNotesPage() {
         </section>
       ) : null}
 
-      <section className="py-12">
-        <div className="mx-auto max-w-[1232px] px-6">
-          <div
-            className="rounded-[28px] px-6 py-12 text-center text-white md:px-12 md:py-16"
-            style={{
-              background:
-                "radial-gradient(circle at 50% 45%, #ff9d2b 0%, #f06a00 38%, #c6451f 58%, #6b1f6b 78%, #2a0a6d 100%)",
-            }}
-          >
-            <div className="mx-auto inline-flex h-[40px] items-center gap-2 rounded-full px-5 text-[14px] font-medium" style={{ background: 'rgba(15, 23, 42, 0.9)', color: '#ffffff' }}>
-              <svg
-                aria-hidden
-                viewBox="0 0 24 24"
-                className="h-4 w-4"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.8"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <path d="M12 3l1.5 4.5L18 9l-4.5 1.5L12 15l-1.5-4.5L6 9l4.5-1.5L12 3Z" />
-              </svg>
-              Coming Soon
-            </div>
-            <h2
-              className="mt-8 text-[32px] font-semibold md:text-[48px] md:leading-[56px]"
-              style={{ textShadow: "0 2px 14px rgba(0, 0, 0, 0.35)" }}
-            >
-              Introducing Great D&apos;Tour
-            </h2>
-            <p
-              className="mx-auto mt-4 max-w-3xl text-[16px] leading-[26px] text-white md:text-[20px] md:leading-[32.5px]"
-              style={{ textShadow: "0 2px 12px rgba(0, 0, 0, 0.35)" }}
-            >
-              A new platform for discovering and booking niche travel experiences. From hidden
-              culinary gems to off-the-beaten-path adventures, Great D&apos;Tour connects you with
-              extraordinary journeys curated by local experts.
-            </p>
-            <div className="mt-8 flex flex-wrap justify-center gap-4">
-              <Link
-                href="/register"
-                className="flex h-12 w-[154px] items-center justify-center rounded-full text-[16px] font-semibold tracking-[-0.31px] transition hover:opacity-90"
-                style={{ background: 'var(--bg-white)', color: 'var(--text-accent)' }}
-              >
-                Sign Up
-              </Link>
-            </div>
-          </div>
-        </div>
-      </section>
-
       {fieldNotes.length ? (
         <section className="py-16">
           <div className="mx-auto max-w-[1232px] px-6">
@@ -335,114 +295,36 @@ export default async function FieldNotesPage() {
         </section>
       ) : null}
 
-      <section className="bg-[#b54a1a] dark:bg-[#101828] text-white">
-        <div className="mx-auto max-w-[1232px] px-6 py-16">
-          <div className="mx-auto max-w-[896px] text-center">
-            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-white/10">
-              <span className="relative h-8 w-8">
-                <span className="absolute" style={{ inset: "16.67% 8.33%" }}>
-                  <img
-                    src="/assets/figma/subscribe-vector-1.svg"
-                    alt=""
-                    className="block h-full w-full"
-                  />
-                </span>
-                <span className="absolute" style={{ inset: "29.17% 8.33% 45.85% 8.33%" }}>
-                  <img
-                    src="/assets/figma/subscribe-vector-2.svg"
-                    alt=""
-                    className="block h-full w-full"
-                  />
-                </span>
-              </span>
+      <section className="px-6 py-16">
+        <div className="mx-auto max-w-[1232px]">
+          <div
+            className="w-full rounded-2xl px-6 py-16 text-center md:px-20 md:py-20"
+            style={{
+              background:
+                "radial-gradient(ellipse 50% 126.87% at 50% 50%, #D0110C 0%, #F47300 40%, #E84300 67%, #290B61 100%)",
+              backdropFilter: "blur(71px)",
+            }}
+          >
+            <div className="mx-auto inline-flex items-center gap-2 rounded-full bg-[#101828] px-5 py-2 text-sm text-white">
+              <img src={starIcon.src} alt="" className="h-4 w-4" />
+              <span>Coming Soon</span>
             </div>
-            <h2
-              className="mt-6 text-[32px] font-semibold md:text-[48px]"
-              style={{ fontFamily: "var(--font-display)" }}
-            >
-              Subscribe to Field Notes
+            <h2 className="mt-8 text-[32px] font-semibold leading-tight text-white md:text-[48px]">
+              Introducing Great D&apos;Tour
             </h2>
-            <p className="mx-auto mt-4 max-w-2xl text-[16px] leading-[1.6] text-white md:text-[20px]">
-              Get our latest stories delivered to your inbox. Join thousands of travelers
-              discovering the world through authentic experiences.
+            <p className="mx-auto mt-4 max-w-3xl text-[18px] leading-8 text-white/90 md:text-[24px]">
+              A new platform for discovering and booking niche travel experiences. From hidden
+              cultural gems to off-the-beaten-path adventures, Great D&apos;Tour connects you with
+              extraordinary journeys curated by local experts.
             </p>
-            <form
-              action="/api/subscribe"
-              method="post"
-              className="mx-auto mt-8 flex w-full max-w-[576px] flex-col gap-4 md:flex-row"
-              suppressHydrationWarning
-            >
-              <label className="flex-1">
-                <span className="sr-only">Email address</span>
-                <input
-                  type="email"
-                  name="email"
-                  required
-                  placeholder="Enter your email address"
-                  className="h-[58px] w-full rounded-full border border-white/20 bg-white/10 px-6 text-[16px] text-white placeholder:text-[#99a1af]"
-                  autoComplete="off"
-                  data-keeper-ignore="true"
-                  data-keeper-lock="false"
-                  data-1p-ignore="true"
-                  data-lpignore="true"
-                  suppressHydrationWarning
-                />
-              </label>
-              <button
-                type="submit"
-                className="flex h-[58px] items-center justify-center gap-2 rounded-full bg-white px-8 text-[16px] font-medium text-[#101828]"
+            <div className="mt-10 flex justify-center">
+              <Link
+                href="/register"
+                className="inline-flex h-12 items-center justify-center rounded-full bg-white px-10 text-[16px] font-semibold text-[#D0110C]"
+                style={{ color: "#D0110C" }}
               >
-                Subscribe
-                <img src="/assets/figma/subscribe-arrow.svg" alt="" className="h-5 w-5" />
-              </button>
-            </form>
-            <p className="mt-4 text-[14px] text-white/80">
-              No spam. Unsubscribe anytime. We respect your privacy.
-            </p>
-          </div>
-
-          <div className="mt-12 flex flex-col gap-8 border-t border-white/10 pt-10 md:flex-row md:items-center md:justify-between">
-            <div>
-              <p className="text-[16px] italic text-white">
-                Follow our journey as we curate India&apos;s most unique travel stories.
-              </p>
-              <div className="mt-4 flex items-center gap-4 text-white/80">
-                <a
-                  href="https://www.facebook.com/profile.php?id=61583154056838"
-                  aria-label="Facebook"
-                  target="_blank"
-                  rel="noreferrer"
-                >
-                  <img src="/assets/figma/social-facebook.svg" alt="" className="h-6 w-6" />
-                </a>
-                <a
-                  href="https://www.instagram.com/greatdtour/"
-                  aria-label="Instagram"
-                  target="_blank"
-                  rel="noreferrer"
-                >
-                  <img src="/assets/figma/social-instagram.svg" alt="" className="h-6 w-6" />
-                </a>
-                <a
-                  href="https://www.linkedin.com/company/greatdtour"
-                  aria-label="LinkedIn"
-                  target="_blank"
-                  rel="noreferrer"
-                >
-                  <img src="/assets/figma/social-linkedin.svg" alt="" className="h-6 w-6" />
-                </a>
-              </div>
-            </div>
-            <div className="text-sm text-white/80 md:text-right">
-              <p>
-                Contact Us :
-                <a className="ml-2 text-white" href="mailto:hello@greatdtour.com">
-                  hello@greatdtour.com
-                </a>
-              </p>
-              <p className="mt-2 text-xs text-white/60">
-                All Rights Reserved by Chomps Innovation Labs LLP, Bengaluru, India
-              </p>
+                Sign Up
+              </Link>
             </div>
           </div>
         </div>

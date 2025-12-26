@@ -38,7 +38,7 @@ async function createPost(formData: FormData) {
   const slug = `${slugBase}-${Date.now().toString().slice(-6)}`;
   const resolvedExcerpt = excerpt || extractPreviewText(content, 160);
   const readTimeMin = estimateReadTimeMinutes(content);
-  const status = (user.role === "ADMIN" && statusRaw ? statusRaw : "DRAFT") as PostStatus;
+  const status = (user.role === "ADMIN" && statusRaw ? statusRaw : "PENDING") as PostStatus;
 
   const tagNames = tagsRaw
     ? tagsRaw.split(",").map((tag) => tag.trim()).filter(Boolean)
@@ -375,7 +375,7 @@ export default async function EditorPage({
                       href={`/editor/edit/${post.id}`}
                       className="text-xs uppercase tracking-[0.3em] text-[color:var(--accent)]"
                     >
-                      Edit and resubmit
+                      {user.role === "ADMIN" && post.authorId === user.id ? "Edit story" : "Edit and resubmit"}
                     </a>
                   )}
                 </div>

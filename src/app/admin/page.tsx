@@ -64,6 +64,10 @@ export default async function AdminPage({
             <h3 className="text-lg font-semibold" style={{ color: 'var(--text-primary)' }}>Moderation</h3>
             <p className="text-sm mt-2" style={{ color: 'var(--text-muted)' }}>Review and approve essays.</p>
           </Link>
+          <Link className="section-card p-6 transition hover:opacity-80" href="/admin/curation">
+            <h3 className="text-lg font-semibold" style={{ color: 'var(--text-primary)' }}>Home curation</h3>
+            <p className="text-sm mt-2" style={{ color: 'var(--text-muted)' }}>Choose featured and editorial picks.</p>
+          </Link>
           <Link className="section-card p-6 transition hover:opacity-80" href="/admin/layout">
             <h3 className="text-lg font-semibold" style={{ color: 'var(--text-primary)' }}>Layout Builder</h3>
             <p className="text-sm mt-2" style={{ color: 'var(--text-muted)' }}>Drag and drop page sections.</p>
