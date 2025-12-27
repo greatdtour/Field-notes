@@ -27,15 +27,15 @@ Create `.env` in the repo root with production values:
 cat <<'ENV' > .env
 # App
 NODE_ENV=production
-JWT_SECRET=change-me-long-random
+JWT_SECRET=change-me-strong-gdt
 
 # Database (for bundled Postgres in docker-compose.yml)
 POSTGRES_USER=postgres
-POSTGRES_PASSWORD=change-me-strong
+POSTGRES_PASSWORD=change-me-strong-gdt
 POSTGRES_DB=postgres
 
 # App database connection
-DATABASE_URL=postgresql://postgres:change-me-strong@db:5432/postgres?schema=gdt_field_notes
+DATABASE_URL=postgresql://postgres:change-me-strong-gdt@db:5432/postgres?schema=gdt_field_notes
 ENV
 ```
 
