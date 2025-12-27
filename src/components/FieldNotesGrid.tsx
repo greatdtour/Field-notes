@@ -387,7 +387,7 @@ export function FieldNotesGrid({
       </section>
 
       {remainingResults.length ? (
-        <section className="mx-auto max-w-[1232px] px-6 pb-20 pt-10">
+        <section className="mx-auto max-w-[1232px] px-6 pb-20 pt-10 relative">
           {viewMode === "grid" ? (
             <div
               key={`page-${animationKey}`}
@@ -449,6 +449,11 @@ export function FieldNotesGrid({
               })}
             </div>
           )}
+          {isFetching ? (
+            <div className="field-notes-loading" aria-hidden>
+              <span className="page-loading-spinner" />
+            </div>
+          ) : null}
         </section>
       ) : null}
       {showPagination ? (
