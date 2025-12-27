@@ -6,6 +6,8 @@ WORKDIR /app
 
 FROM base AS deps
 COPY package.json package-lock.json ./
+# Include Prisma schema for postinstall generate during npm ci
+COPY prisma ./prisma
 RUN npm ci
 
 FROM base AS builder
