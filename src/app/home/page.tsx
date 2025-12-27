@@ -170,23 +170,24 @@ export default async function FieldNotesPage() {
             <p className="text-[14px] uppercase tracking-[0.55px]" style={{ color: 'var(--text-muted)' }}>
               Featured Essay
             </p>
-            <Link
-              href={`/essay/${featured.slug}`}
-              className="mt-8 grid gap-8 pb-16 md:grid-cols-2"
-              style={{ borderBottom: '1px solid var(--border-gray)' }}
-            >
-              <div className="order-2 md:order-1">
-                {getPhotoId(featured.media) ? (
-                  <img
-                    src={`/api/media/${getPhotoId(featured.media)}`}
-                    alt={featured.title}
-                    className="h-[240px] w-full rounded-[10px] object-cover md:h-[375px]"
-                  />
-                ) : (
-                  <div className="h-[240px] w-full rounded-[10px] bg-gradient-to-br from-[#fef3c7] to-[#fde68a] md:h-[375px]" />
-                )}
-              </div>
-              <div className="order-1 md:order-2">
+            {(() => {
+              const featuredMediaId = getPhotoId(featured.media);
+              return (
+              <Link
+                href={`/essay/${featured.slug}`}
+                className={`mt-8 grid gap-8 pb-16 ${featuredMediaId ? "md:grid-cols-2" : ""}`}
+                style={{ borderBottom: '1px solid var(--border-gray)' }}
+              >
+                {featuredMediaId ? (
+                  <div className="order-2 md:order-1">
+                    <img
+                      src={`/api/media/${featuredMediaId}`}
+                      alt={featured.title}
+                      className="h-[240px] w-full rounded-[10px] object-cover md:h-[375px]"
+                    />
+                  </div>
+                ) : null}
+                <div className="order-1 md:order-2">
                 <p className="text-[14px] uppercase tracking-[0.55px] text-[#f54900]">
                   {getCategoryLabel(featured.categories)}
                 </p>
@@ -220,8 +221,10 @@ export default async function FieldNotesPage() {
                   <span aria-hidden>&middot;</span>
                   <span>{featured.readTimeMin} min read</span>
                 </div>
-              </div>
-            </Link>
+                </div>
+              </Link>
+              );
+            })()}
           </div>
         </section>
       ) : null}

@@ -269,9 +269,7 @@ export function EssayActionIcons({
             <div className="mt-4 overflow-hidden rounded-xl border" style={{ borderColor: 'var(--border-gray)', background: 'var(--bg-gray-50)' }}>
               {imageUrl ? (
                 <img src={imageUrl} alt="" className="h-32 w-full object-cover" />
-              ) : (
-                <div className="h-32 w-full bg-gradient-to-br from-[#f1f5f9] to-[#e2e8f0]" />
-              )}
+              ) : null}
               <div className="p-4">
                 <p className="text-[14px] font-semibold" style={{ color: 'var(--text-primary)' }}>{title || "Field Note"}</p>
                 <p className="mt-1 text-[13px]" style={{ color: 'var(--text-muted)' }}>
