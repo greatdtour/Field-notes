@@ -1102,12 +1102,13 @@ export function BlockEditor({
                 <span>Heading level</span>
                 <div className="flex gap-2">
                   {HEADING_LEVELS.map((level) => {
-                    const isActive = headingLevel === level;
+                    const safeLevel = level ?? "h1";
+                    const isActive = headingLevel === safeLevel;
                     return (
                       <button
-                        key={`${block.id}-${level}`}
+                        key={`${block.id}-${safeLevel}`}
                         type="button"
-                        onClick={() => updateBlock(block.id, { level })}
+                        onClick={() => updateBlock(block.id, { level: safeLevel })}
                         className="rounded-full border px-3 py-1 text-[10px] uppercase tracking-[0.2em] transition"
                         style={{
                           borderColor: isActive ? "var(--accent)" : "var(--border-gray)",
@@ -1115,7 +1116,7 @@ export function BlockEditor({
                           color: isActive ? "var(--bg-white)" : "var(--text-secondary)",
                         }}
                       >
-                        {level.toUpperCase()}
+                        {safeLevel.toUpperCase()}
                       </button>
                     );
                   })}
