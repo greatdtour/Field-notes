@@ -7,6 +7,12 @@ const JWT_SECRET = new TextEncoder().encode(
   process.env.JWT_SECRET ?? "dev-local-secret"
 );
 const SESSION_COOKIE = "gdt_session";
+const COOKIE_SECURE =
+  process.env.COOKIE_SECURE === "true"
+    ? true
+    : process.env.COOKIE_SECURE === "false"
+      ? false
+      : process.env.NODE_ENV === "production";
 
 export async function hashPassword(password: string) {
   return bcrypt.hash(password, 10);
@@ -27,7 +33,7 @@ export async function createSession(userId: string, role: string) {
   cookieStore.set(SESSION_COOKIE, token, {
     httpOnly: true,
     sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
+    secure: COOKIE_SECURE,
     path: "/",
   });
 }
@@ -37,7 +43,7 @@ export async function clearSession() {
   cookieStore.set(SESSION_COOKIE, "", {
     httpOnly: true,
     sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
+    secure: COOKIE_SECURE,
     path: "/",
     maxAge: 0,
   });
