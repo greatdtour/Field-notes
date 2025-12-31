@@ -43,3 +43,4 @@ app.tgz
 app.zip
 app-min.zip
 env copy
+DEPLOYMENT.md

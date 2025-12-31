@@ -29,7 +29,7 @@ cat <<'ENV' > .env
 NODE_ENV=production
 JWT_SECRET=change-me-strong-gdt
 # If running over HTTPS keep default; for HTTP-only (temporary) set to false so cookies work
-COOKIE_SECURE=false
+#COOKIE_SECURE=false
 
 # Database (for bundled Postgres in docker-compose.yml)
 POSTGRES_USER=postgres
